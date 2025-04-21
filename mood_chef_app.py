@@ -1,25 +1,27 @@
 import streamlit as st
 import google.generativeai as genai
 
-# Configure the API key
-genai.configure(api_key="AIzaSyAwD8E-BJXs9d4jDMQ_23rZ1ukk7y0HpVk")  # Replace with your actual API key
+# **Security Note:** It's best practice to manage API keys securely, not directly in the code.
+# Consider using Streamlit Secrets or environment variables.
+genai.configure(api_key="AIzaSyAwD8E-BJXs9d4jDMQ_23rZ1ukk7y0HpVk")
 
-# Model setup
-generation_config = {
-    "temperature": 1,
-    "top_p": 0.95,
-    "top_k": 64,
-    "max_output_tokens": 65536,
-    "response_mime_type": "text/plain",
-}
+# Model setup - Consider initializing this outside the main flow if it's a one-time setup
+@st.cache_resource
+def load_gemini_model():
+    generation_config = {
+        "temperature": 1,
+        "top_p": 0.95,
+        "top_k": 64,
+        "max_output_tokens": 65536,
+        "response_mime_type": "text/plain",
+    }
+    return genai.GenerativeModel(
+        model_name="gemini-2.5-flash-preview-04-17",
+        generation_config=generation_config,
+        system_instruction="""You are the Mood Chef: Mood-Based Recipe Recommendation System with Dynamic Cooking Constraints.
 
-model = genai.GenerativeModel(
-    model_name="gemini-2.5-flash-preview-04-17",
-    generation_config=generation_config,
-    system_instruction="""You are the Mood Chef: Mood-Based Recipe Recommendation System with Dynamic Cooking Constraints.
-
-Generates recipes based on ingredients available (will be given as a list) and mood of the user.  
-Step 1: Find recipes based on ingredients. 
+Generates recipes based on ingredients available (will be given as a list) and mood of the user.
+Step 1: Find recipes based on ingredients.
 Step 2: Rank them based on metrics like : Prep Time, Cook Time, Cleaning Time, # of ingredients
 
 Note: If the user is in good mood and is excited to eat something new, choose a dish with higher Prep Time, Cook Time, Cleaning Time, # of ingredients and vice versa.
@@ -32,17 +34,22 @@ Then ask what I want to cook
 
 Then give recipe in this format:
 
-Recipe Name  
-Cuisine  
-Servings  
-Prep Time  
-Ingredients  
+Recipe Name
+Cuisine
+Servings
+Prep Time
+Ingredients
 Instructions"""
-)
+    )
 
-chat_session = model.start_chat(history=[])
+model = load_gemini_model()
 
-# Streamlit UI
+# Initialize chat session in Streamlit's session state
+if "chat_session" not in st.session_state:
+    st.session_state["chat_session"] = model.start_chat(history=[])
+
+chat_session = st.session_state["chat_session"]
+
 st.title("🍲 Mood Chef")
 
 with st.form("mood_form"):
@@ -53,14 +60,15 @@ with st.form("mood_form"):
 if submitted and ingredients:
     with st.spinner("Cooking up ideas..."):
         response = chat_session.send_message(f"{ingredients}\nHappiness Score (Out of 10): {mood}")
-        suggestions = response.text
+        st.session_state["suggestions"] = response.text
     st.subheader("🍽️ Recipe Suggestions")
-    st.markdown(f"```\n{suggestions}\n```")
+    st.markdown(f"```\n{st.session_state['suggestions']}\n```")
 
-    recipe_name = st.text_input("Enter the name of the recipe you'd like to cook:")
+recipe_name = st.text_input("Enter the name of the recipe you'd like to cook:")
 
-    if recipe_name:
-        with st.spinner("Fetching the full recipe..."):
-            recipe_response = chat_session.send_message(recipe_name)
-        st.subheader("📋 Full Recipe")
-        st.markdown(f"```\n{recipe_response.text}\n```")
+if recipe_name:
+    with st.spinner("Fetching the full recipe..."):
+        recipe_response = chat_session.send_message(recipe_name)
+        st.session_state["full_recipe"] = recipe_response.text
+    st.subheader("📋 Full Recipe")
+    st.markdown(f"```\n{st.session_state['full_recipe']}\n```")
