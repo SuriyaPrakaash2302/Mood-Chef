@@ -77,9 +77,57 @@ if submitted and ingredients:
 if "suggestions" in st.session_state:
     st.subheader("🍽️ Recipe Suggestions")
     if st.session_state.get("recipe_df") is not None:
-        st.dataframe(st.session_state["recipe_df"])
-    else:
-        st.markdown(st.session_state["suggestions"], unsafe_allow_html=True)
+        df = st.session_state["recipe_df"]
+
+        st.html(f"""
+        <style>
+        .cookbook-table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px auto;
+            font-family: 'Georgia', serif;
+            background-color: #fffdf7;
+            border: 2px solid #f4d9a4;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 4px 4px 12px rgba(0,0,0,0.1);
+            color: black;
+        }}
+        .cookbook-table th, .cookbook-table td {{
+            padding: 0.75rem 1rem;
+            text-align: center;
+            border-bottom: 1px solid #ddd;
+            color: black;
+        }}
+        .cookbook-table th {{
+            background-color: #fef3dc;
+            color: black;
+            font-size: 1.1rem;
+        }}
+        .cookbook-table tr:nth-child(even) {{
+            background-color: #f9f4ea;
+            color: black;
+        }}
+        .cookbook-table tr:hover {{
+            background-color: #fff5e1;
+        }}
+        </style>
+
+        <table class="cookbook-table">
+            <thead>
+                <tr>
+                    {''.join(f'<th>{col}</th>' for col in df.columns)}
+                </tr>
+            </thead>
+            <tbody>
+                {''.join(
+                    '<tr>' + ''.join(f'<td>{cell}</td>' for cell in row) + '</tr>'
+                    for row in df.values.tolist()
+                )}
+            </tbody>
+        </table>
+        """)
+
 
 
 recipe_options = []
@@ -95,7 +143,7 @@ final_recipe_name = custom_recipe_name.strip() if custom_recipe_name.strip() els
 
 if final_recipe_name:
     with st.spinner("Fetching the full recipe..."):
-        recipe_response = chat_session.send_message("""Make the output in json format without markdown. DOnt use suffix json. I need only the dictionary. Get me the recipe for""" + final_recipe_name+ 
+        recipe_response = chat_session.send_message("""Make the output in json format without markdown. it is very important that there is no markdown in the output DOnt use suffix json. I need only the dictionary. Get me the recipe for""" + final_recipe_name+ 
                                                     """  as a json with headers
                                                      **Recipe Title**
 
@@ -122,7 +170,7 @@ if final_recipe_name:
     print(recipe_json)
 
     # HTML display
-    html = f"""
+    st.html(f"""
     <style>
     .recipe-card {{
         background-color: #fffdf7;
@@ -190,8 +238,8 @@ if final_recipe_name:
             {''.join(f"<li>{step}</li>" for step in recipe_json.get('Instructions', []))}
         </ol>
     </div>
-    """
+    """)
 
     # Render in Streamlit
-    st.markdown(html, unsafe_allow_html=True)
+    #st.markdown(html, unsafe_allow_html=True)
 
