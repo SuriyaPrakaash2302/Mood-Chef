@@ -1,5 +1,8 @@
 import streamlit as st
 import google.generativeai as genai
+from bs4 import BeautifulSoup
+import pandas as pd
+
 
 # **Security Note:** It's best practice to manage API keys securely, not directly in the code.
 # Consider using Streamlit Secrets or environment variables.
@@ -26,20 +29,13 @@ Step 2: Rank them based on metrics like : Prep Time, Cook Time, Cleaning Time, #
 
 Note: If the user is in good mood and is excited to eat something new, choose a dish with higher Prep Time, Cook Time, Cleaning Time, # of ingredients and vice versa.
 
-The output should be structured in the following format:
+The output should be structured in the following format: Only the table which is displayed in html
 
 List the recipes based on the ranking along with the table of  Prep Time, Cook Time, Cleaning Time, # of ingredients
 
 Then ask what I want to cook
 
-Then give recipe in this format:
-
-Recipe Name
-Cuisine
-Servings
-Prep Time
-Ingredients
-Instructions"""
+"""
     )
 
 model = load_gemini_model()
@@ -62,7 +58,26 @@ if submitted and ingredients:
         response = chat_session.send_message(f"{ingredients}\nHappiness Score (Out of 10): {mood}")
         st.session_state["suggestions"] = response.text
     st.subheader("🍽️ Recipe Suggestions")
-    st.markdown(f"```\n{st.session_state['suggestions']}\n```")
+    # Parse HTML to DataFrame
+    soup = BeautifulSoup(st.session_state["suggestions"], "html.parser")
+    table = soup.find("table")
+    if table:
+        # Extract headers
+        headers = [th.get_text(strip=True) for th in table.find_all("th")]
+
+        # Extract rows
+        rows = []
+        for tr in table.find_all("tr")[1:]:
+            cells = [td.get_text(strip=True) for td in tr.find_all("td")]
+            if cells:
+                rows.append(cells)
+
+        df = pd.DataFrame(rows, columns=headers)
+        st.dataframe(df)
+    else:
+        st.markdown(st.session_state["suggestions"], unsafe_allow_html=True)
+
+    
 
 recipe_name = st.text_input("Enter the name of the recipe you'd like to cook:")
 
