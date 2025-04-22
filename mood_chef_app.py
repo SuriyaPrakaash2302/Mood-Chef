@@ -2,7 +2,8 @@ import streamlit as st
 import google.generativeai as genai
 from bs4 import BeautifulSoup
 import pandas as pd
-
+import json
+import re
 
 # **Security Note:** It's best practice to manage API keys securely, not directly in the code.
 # Consider using Streamlit Secrets or environment variables.
@@ -57,33 +58,140 @@ if submitted and ingredients:
     with st.spinner("Cooking up ideas..."):
         response = chat_session.send_message(f"{ingredients}\nHappiness Score (Out of 10): {mood}")
         st.session_state["suggestions"] = response.text
+
+        # Parse HTML to DataFrame and store it
+        soup = BeautifulSoup(response.text, "html.parser")
+        table = soup.find("table")
+        if table:
+            headers = [th.get_text(strip=True) for th in table.find_all("th")]
+            rows = []
+            for tr in table.find_all("tr")[1:]:
+                cells = [td.get_text(strip=True) for td in tr.find_all("td")]
+                if cells:
+                    rows.append(cells)
+            st.session_state["recipe_df"] = pd.DataFrame(rows, columns=headers)
+        else:
+            st.session_state["recipe_df"] = None
+
+# Display section — shown whether or not a new form is submitted
+if "suggestions" in st.session_state:
     st.subheader("🍽️ Recipe Suggestions")
-    # Parse HTML to DataFrame
-    soup = BeautifulSoup(st.session_state["suggestions"], "html.parser")
-    table = soup.find("table")
-    if table:
-        # Extract headers
-        headers = [th.get_text(strip=True) for th in table.find_all("th")]
-
-        # Extract rows
-        rows = []
-        for tr in table.find_all("tr")[1:]:
-            cells = [td.get_text(strip=True) for td in tr.find_all("td")]
-            if cells:
-                rows.append(cells)
-
-        df = pd.DataFrame(rows, columns=headers)
-        st.dataframe(df)
+    if st.session_state.get("recipe_df") is not None:
+        st.dataframe(st.session_state["recipe_df"])
     else:
         st.markdown(st.session_state["suggestions"], unsafe_allow_html=True)
 
-    
 
-recipe_name = st.text_input("Enter the name of the recipe you'd like to cook:")
+recipe_options = []
+if "recipe_df" in st.session_state and st.session_state["recipe_df"] is not None:
+    # Assume the first column contains the recipe names
+    recipe_options = st.session_state["recipe_df"].iloc[:, 0].tolist()
 
-if recipe_name:
+st.subheader("👩‍🍳 Pick Your Recipe")
+selected_recipe = st.selectbox("Choose a recipe from the suggestions:", options=[""] + recipe_options)
+custom_recipe_name = st.text_input("Or enter your own recipe name:")
+
+final_recipe_name = custom_recipe_name.strip() if custom_recipe_name.strip() else selected_recipe.strip()
+
+if final_recipe_name:
     with st.spinner("Fetching the full recipe..."):
-        recipe_response = chat_session.send_message(recipe_name)
+        recipe_response = chat_session.send_message("""Make the output in json format without markdown. DOnt use suffix json. I need only the dictionary. Get me the recipe for""" + final_recipe_name+ 
+                                                    """  as a json with headers
+                                                     **Recipe Title**
+
+                                                    *(optional description)*
+
+                                                        **Yields:** ...
+                                                    **Prep time:** ...
+                                                    **Cook time:** ...
+
+                                                    **Ingredients:**
+
+
+                                                    **Instructions:**
+
+                                                    """)
         st.session_state["full_recipe"] = recipe_response.text
     st.subheader("📋 Full Recipe")
-    st.markdown(f"```\n{st.session_state['full_recipe']}\n```")
+
+    # Sample recipe_json - replace this with your actual JSON dictionary
+    #print(recipe_response.text)
+    #json_match = re.search(r'\{.*\}', recipe_response.text, re.DOTALL)
+    print(recipe_response.text)
+    recipe_json = json.loads(recipe_response.text)
+    print(recipe_json)
+
+    # HTML display
+    html = f"""
+    <style>
+    .recipe-card {{
+        background-color: #fffdf7;
+        padding: 2rem;
+        border: 2px solid #f4d9a4;
+        border-radius: 15px;
+        box-shadow: 4px 4px 12px rgba(0,0,0,0.1);
+        font-family: 'Georgia', serif;
+        max-width: 800px;
+        margin: auto;
+        line-height: 1.6;
+        color: #3e3e3e;
+    }}
+
+    .recipe-title {{
+        font-size: 2.2rem;
+        font-weight: bold;
+        color: #b35c1e;
+        text-align: center;
+        margin-bottom: 0.5rem;
+    }}
+
+    .description {{
+        font-style: italic;
+        text-align: center;
+        color: #666;
+        margin-bottom: 1.5rem;
+    }}
+
+    .details {{
+        text-align: center;
+        margin-bottom: 2rem;
+        font-size: 1.1rem;
+    }}
+
+    .section-title {{
+        font-size: 1.4rem;
+        margin-top: 1.5rem;
+        color: #774400;
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 0.3rem;
+    }}
+
+    ul, ol {{
+        padding-left: 1.5rem;
+    }}
+    </style>
+
+    <div class="recipe-card">
+        <div class="recipe-title">{recipe_json['Recipe Title']}</div>
+        <div class="description">{recipe_json.get('Optional Description', '')}</div>
+        <div class="details">
+            <strong>Yields:</strong> {recipe_json.get('Yields', 'N/A')} &nbsp; | &nbsp;
+            <strong>Prep Time:</strong> {recipe_json.get('Prep time', 'N/A')} &nbsp; | &nbsp;
+            <strong>Cook Time:</strong> {recipe_json.get('Cook time', 'N/A')}
+        </div>
+
+        <div class="section-title">🧂 Ingredients</div>
+        <ul>
+            {''.join(f"<li>{item}</li>" for item in recipe_json.get('Ingredients', []))}
+        </ul>
+
+        <div class="section-title">👨‍🍳 Instructions</div>
+        <ol>
+            {''.join(f"<li>{step}</li>" for step in recipe_json.get('Instructions', []))}
+        </ol>
+    </div>
+    """
+
+    # Render in Streamlit
+    st.markdown(html, unsafe_allow_html=True)
+
