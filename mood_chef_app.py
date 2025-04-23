@@ -22,19 +22,59 @@ def load_gemini_model():
     return genai.GenerativeModel(
         model_name="gemini-2.5-flash-preview-04-17",
         generation_config=generation_config,
-        system_instruction="""You are the Mood Chef: Mood-Based Recipe Recommendation System with Dynamic Cooking Constraints.
+        system_instruction="""DONT USE MARKDOWN IN OUTPUTS EVERRRRRRRRRRRR  DO NOT INCLUDE BACKTICKS IN THE RESPONSE
 
-Generates recipes based on ingredients available (will be given as a list) and mood of the user.
-Step 1: Find recipes based on ingredients.
-Step 2: Rank them based on metrics like : Prep Time, Cook Time, Cleaning Time, # of ingredients
+        Prompt:
 
-Note: If the user is in good mood and is excited to eat something new, choose a dish with higher Prep Time, Cook Time, Cleaning Time, # of ingredients and vice versa.
+You are Mood Chef, an intelligent recipe recommendation system that tailors recipe suggestions based on the user’s mood and available ingredients.
 
-The output should be structured in the following format: Only the table which is displayed in html
+Instructions:
 
-List the recipes based on the ranking along with the table of  Prep Time, Cook Time, Cleaning Time, # of ingredients
+Step 1 – Recipe Generation:
+Based on the list of ingredients provided by the user, generate a list of possible recipes.
 
-Then ask what I want to cook
+Step 2 – Recipe Ranking (Mood-Based):
+Adjust the ranking of the recipes depending on the user’s mood:
+
+If the user is in a good mood and feeling excited to cook, prioritize:
+
+Higher Prep Time
+
+Higher Cook Time
+
+Higher Cleaning Time
+
+Greater # of ingredients
+
+If the user is in a tired, lazy, or low-energy mood, prioritize:
+
+Lower Prep Time
+
+Lower Cook Time
+
+Lower Cleaning Time
+
+Fewer # of ingredients
+
+Step 3 – Display Results:
+Output only a ranked HTML table of recipes based on the criteria above.
+Each row must include:
+
+Recipe Name
+
+Prep Time (min)
+
+Cook Time (min)
+
+Cleaning Time (min)
+
+# of Ingredients
+
+Step 4 – Follow-up:
+After displaying the table, ask the user:
+“Which one would you like to cook?”
+
+
 
 """
     )
@@ -143,8 +183,8 @@ final_recipe_name = custom_recipe_name.strip() if custom_recipe_name.strip() els
 
 if final_recipe_name:
     with st.spinner("Fetching the full recipe..."):
-        recipe_response = chat_session.send_message("""Make the output in json format without markdown. it is very important that there is no markdown in the output DOnt use suffix json. I need only the dictionary. Get me the recipe for""" + final_recipe_name+ 
-                                                    """  as a json with headers
+        recipe_response = chat_session.send_message("""Make the output in json format without markdown. DO NOT INCLUDE BACKTICKS IN THE RESPONSE, it is very important that there is no markdown in the output DOnt use suffix json. I need only the dictionary. Get me the recipe for""" + final_recipe_name+ 
+                                                    """  as a json with headers. fOLLOW THE HEADERS NAME I GIVE BELOW
                                                      **Recipe Title**
 
                                                     *(optional description)*
@@ -158,7 +198,11 @@ if final_recipe_name:
 
                                                     **Instructions:**
 
-                                                    """)
+                                                    rememMBER no markdown
+
+                                                    eXAMPLE:
+
+                                                    {'Recipe Title': 'Basic Boiled Potatoes with Salt', 'Yields': '1-2 servings', 'Prep time': '10-15 minutes', 'Cook time': '15-25 minutes', 'Ingredients': ['1-2 medium potatoes', 'Water', 'Salt, to taste'], 'Instructions': ['Wash the potatoes thoroughly.', 'Peel the potatoes if desired, or leave the skin on.', 'Cut larger potatoes into halves or quarters for more even cooking. Smaller potatoes can be boiled whole.', 'Place the potatoes in a pot and cover them with cold water.', 'Add a generous pinch of salt to the water.', 'Bring the water to a boil over high heat.', 'Reduce the heat to medium and simmer the potatoes until they are tender when pierced with a fork.', 'Drain the potatoes thoroughly.', 'Serve hot, adding more salt if desired.']} """)
         st.session_state["full_recipe"] = recipe_response.text
     st.subheader("📋 Full Recipe")
 
